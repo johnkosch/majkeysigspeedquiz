@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Major Key Signature Speed Quiz</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:30px 20px;font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;color:#222}
+.app{max-width:1100px;margin:0 auto;background:#fff;border-radius:16px;padding:32px;box-shadow:0 4px 20px rgba(0,0,0,.12)}
+h1{text-align:center;margin:0 0 10px;font-size:28px}
+.instruction{text-align:center;margin:0 0 22px;font-size:17px;color:#555}
+.timer-panel{text-align:center;margin:0 auto 26px}
+.timer-label{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#777;margin-bottom:2px}
+#timer{font-family:Georgia,"Times New Roman",serif;font-size:32px;font-variant-numeric:tabular-nums;margin-bottom:8px}
+.timer-controls{display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+button{border:0;border-radius:8px;padding:12px 22px;font-size:16px;font-weight:bold;cursor:pointer}
+.timer-controls button{border:1px solid #bbb;background:#fff;color:#333;padding:8px 15px;font-size:14px}
+button:hover{opacity:.85}
+#checkButton{background:#222;color:#fff}
+#resetButton{background:#ddd;color:#222}
+#stopButton{background:#fff}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.clef-section{border:1px solid #ddd;border-radius:12px;padding:18px;background:#fafafa}
+.clef-title{text-align:center;font-size:18px;font-weight:bold;margin-bottom:14px}
+.questions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.question{border:1px solid #ddd;border-radius:10px;padding:10px 12px;background:#fff;text-align:center}
+.notation{height:125px;display:flex;align-items:center;justify-content:center}
+.notation img{display:block;max-width:100%;max-height:115px;width:auto;height:auto;object-fit:contain}
+.answer-label{display:block;font-weight:bold;font-size:14px;margin:4px 0 5px}
+input{width:100%;height:42px;border:2px solid #bbb;border-radius:7px;font-family:Georgia,"Times New Roman",serif;font-size:20px;text-align:center}
+input:focus{outline:none;border-color:#333}
+input.correct{border-color:#2f8744;background:#f2faf4}
+input.incorrect{border-color:#b52b2b;background:#fff4f4}
+.feedback{min-height:20px;text-align:center;margin-top:7px;font-weight:bold;font-size:13px}
+.correct-text{color:#176b2c}.incorrect-text{color:#a51d1d}
+.actions{text-align:center;margin-top:28px}
+#overallFeedback{min-height:25px;text-align:center;margin-top:10px;font-weight:bold;font-size:16px}
+@media(max-width:800px){
+  .grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .app{padding:22px 14px}
+  .questions{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>Major Key Signature Speed Quiz</h1>
+<p class="instruction">Identify each major key signature</p>
+
+<div class="timer-panel" aria-live="polite">
+  <div class="timer-label">Time</div>
+  <div id="timer">00:00.0</div>
+  <div class="timer-controls">
+    <button type="button" id="stopButton">Stop Timer</button>
+    <button type="button" id="timerReset">Reset Timer</button>
+  </div>
+</div>
+
+<form id="quiz">
+  <div class="grid">
+    <section class="clef-section">
+      <div class="clef-title">Treble Clef</div>
+      <div id="trebleQuestions" class="questions"></div>
+    </section>
+    <section class="clef-section">
+      <div class="clef-title">Bass Clef</div>
+      <div id="bassQuestions" class="questions"></div>
+    </section>
+  </div>
+
+  <div class="actions">
+    <button type="submit" id="checkButton">Check Answers</button>
+    <button type="button" id="resetButton">Reset Quiz</button>
+  </div>
+  <div id="overallFeedback" aria-live="polite"></div>
+</form>
+</div>
+
+<script>
+/*
+  Twelve major key signatures are used:
+  G♭, D♭, A♭, E♭, B♭, F, G, D, A, E, B, F♯.
+  C major, C♭ major, and C♯ major are intentionally excluded.
+
+  The 24 supplied images are used directly. No notation engine
+  or external library is required.
+*/
+
+const KEYS = [
+  {name:"G-flat major", answer:"Gb", treble:"treble-gb.png", bass:"bass-gb.png"},
+  {name:"D-flat major", answer:"Db", treble:"treble-db.png", bass:"bass-db.png"},
+  {name:"A-flat major", answer:"Ab", treble:"treble-ab.png", bass:"bass-ab.png"},
+  {name:"E-flat major", answer:"Eb", treble:"treble-eb.png", bass:"bass-eb.png"},
+  {name:"B-flat major", answer:"Bb", treble:"treble-bb.png", bass:"bass-bb.png"},
+  {name:"F major", answer:"F", treble:"treble-f.png", bass:"bass-f.png"},
+  {name:"G major", answer:"G", treble:"treble-g.png", bass:"bass-g.png"},
+  {name:"D major", answer:"D", treble:"treble-d.png", bass:"bass-d.png"},
+  {name:"A major", answer:"A", treble:"treble-a.png", bass:"bass-a.png"},
+  {name:"E major", answer:"E", treble:"treble-e.png", bass:"bass-e.png"},
+  {name:"B major", answer:"B", treble:"treble-b.png", bass:"bass-b.png"},
+  {name:"F-sharp major", answer:"F#", treble:"treble-fsharp.png", bass:"bass-fsharp.png"}
+];
+
+let trebleOrder=[];
+let bassOrder=[];
+
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function normalizeAnswer(s){
+  return s.trim()
+    .toLowerCase()
+    .replace(/[♯＃]/g,"#")
+    .replace(/[♭]/g,"b")
+    .replace(/sharp/g,"#")
+    .replace(/flat/g,"b")
+    .replace(/[\s-]+/g,"")
+    .toUpperCase();
+}
+
+function build(){
+  trebleOrder=shuffle(KEYS);
+  bassOrder=shuffle(KEYS);
+
+  buildSection("trebleQuestions",trebleOrder,"treble");
+  buildSection("bassQuestions",bassOrder,"bass");
+  document.getElementById("overallFeedback").textContent="";
+}
+
+function buildSection(id,order,clef){
+  const container=document.getElementById(id);
+  container.innerHTML="";
+
+  order.forEach((key,i)=>{
+    const q=document.createElement("div");
+    q.className="question";
+
+    const notation=document.createElement("div");
+    notation.className="notation";
+
+    const img=document.createElement("img");
+    img.src=key[clef];
+    img.alt=`${clef} clef key signature`;
+    img.draggable=false;
+    notation.appendChild(img);
+
+    const label=document.createElement("label");
+    label.className="answer-label";
+    label.htmlFor=`${clef}-${i}`;
+    label.textContent="Tonic";
+
+    const input=document.createElement("input");
+    input.id=`${clef}-${i}`;
+    input.type="text";
+    input.autocomplete="off";
+    input.spellcheck=false;
+    input.inputMode="text";
+    input.setAttribute("aria-label",`${clef} clef key signature ${i+1} tonic`);
+
+    const feedback=document.createElement("div");
+    feedback.className="feedback";
+    feedback.id=`${clef}-feedback-${i}`;
+    feedback.setAttribute("aria-live","polite");
+
+    q.append(notation,label,input,feedback);
+    container.appendChild(q);
+  });
+}
+
+/* Timer */
+let timerStarted=false;
+let timerRunning=false;
+let timerStartTime=0;
+let timerElapsed=0;
+let timerFrame=null;
+
+function formatTime(ms){
+  const total=ms/1000;
+  const min=Math.floor(total/60);
+  const sec=Math.floor(total%60);
+  const tenth=Math.floor((total%1)*10);
+  return String(min).padStart(2,"0")+":"+String(sec).padStart(2,"0")+"."+tenth;
+}
+
+function renderTimer(){
+  const now=performance.now();
+  const elapsed=timerRunning ? now-timerStartTime : timerElapsed;
+  document.getElementById("timer").textContent=formatTime(elapsed);
+}
+
+function tick(){
+  renderTimer();
+  if(timerRunning) timerFrame=requestAnimationFrame(tick);
+}
+
+function startTimer(){
+  if(timerStarted)return;
+  timerStarted=true;
+  timerRunning=true;
+  timerStartTime=performance.now();
+  timerElapsed=0;
+  tick();
+}
+
+function stopTimer(){
+  if(!timerRunning)return;
+  timerElapsed=performance.now()-timerStartTime;
+  timerRunning=false;
+  if(timerFrame!==null){
+    cancelAnimationFrame(timerFrame);
+    timerFrame=null;
+  }
+  renderTimer();
+}
+
+function resetTimer(){
+  timerStarted=false;
+  timerRunning=false;
+  timerStartTime=0;
+  timerElapsed=0;
+  if(timerFrame!==null){
+    cancelAnimationFrame(timerFrame);
+    timerFrame=null;
+  }
+  renderTimer();
+}
+
+document.getElementById("stopButton").addEventListener("click",stopTimer);
+document.getElementById("timerReset").addEventListener("click",resetTimer);
+
+document.getElementById("quiz").addEventListener("input",e=>{
+  if(e.target.matches("input") && e.target.value.length>0)startTimer();
+});
+
+/* Check answers */
+function checkSection(order,clef){
+  let correct=0;
+
+  order.forEach((key,i)=>{
+    const input=document.getElementById(`${clef}-${i}`);
+    const fb=document.getElementById(`${clef}-feedback-${i}`);
+    const ok=normalizeAnswer(input.value)===normalizeAnswer(key.answer);
+
+    input.classList.remove("correct","incorrect");
+
+    if(ok){
+      correct++;
+      input.classList.add("correct");
+      fb.textContent="✓ Correct";
+      fb.className="feedback correct-text";
+    }else{
+      input.classList.add("incorrect");
+      fb.textContent=`Correct answer: ${key.answer}`;
+      fb.className="feedback incorrect-text";
+    }
+  });
+
+  return correct;
+}
+
+document.getElementById("quiz").addEventListener("submit",e=>{
+  e.preventDefault();
+
+  // Stop the clock immediately when the student checks the answers.
+  stopTimer();
+
+  const total=checkSection(trebleOrder,"treble")+
+              checkSection(bassOrder,"bass");
+
+  const overall=document.getElementById("overallFeedback");
+  overall.textContent=`${total} of 24 correct.`;
+  overall.className=total===24 ? "correct-text" : "incorrect-text";
+});
+
+/* Reset Quiz = clear everything AND create new random orders */
+document.getElementById("resetButton").addEventListener("click",()=>{
+  resetTimer();
+  build();
+});
+
+build();
+renderTimer();
+</script>
+</body>
+</html>
